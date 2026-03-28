@@ -247,3 +247,7 @@ python3 src/phase5/evaluate.py score \
 ## 📜 License
 
 MIT — for educational / research use.
+
+![alt text](<Screenshot 2026-03-28 at 5.18.29 PM.png>)
+
+![alt text](<Screenshot 2026-03-28 at 5.21.37 PM.png>)
