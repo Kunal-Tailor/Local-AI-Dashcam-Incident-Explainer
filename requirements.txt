@@ -1,0 +1,28 @@
+# ─── Core Computer Vision ────────────────────────────────────────────────────
+opencv-python>=4.9.0
+numpy>=1.26.0
+Pillow>=10.3.0
+
+# ─── YOLO11 (Ultralytics) ─────────────────────────────────────────────────────
+ultralytics>=8.2.0
+
+# ─── Optical Flow / Tracking ─────────────────────────────────────────────────
+# NOTE: SORT tracker is implemented inline (no external package needed)
+scipy>=1.12.0         # for linear_sum_assignment (Hungarian algorithm)
+
+# ─── Ollama Python Client ────────────────────────────────────────────────────
+ollama>=0.2.0
+
+# ─── Gradio UI ───────────────────────────────────────────────────────────────
+gradio>=4.26.0
+
+# ─── PDF Export ──────────────────────────────────────────────────────────────
+reportlab>=4.1.0
+
+# ─── Evaluation Metrics ──────────────────────────────────────────────────────
+nltk>=3.8.1
+rouge-score>=0.1.2
+
+# ─── Utilities ───────────────────────────────────────────────────────────────
+tqdm>=4.66.0
+python-dotenv>=1.0.0

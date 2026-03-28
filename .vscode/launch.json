@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "🚗 Run Gradio Web UI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/phase4/app.py",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "DASHCAM_MOCK_OLLAMA": "1"
+      },
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "📊 Run CLI Pipeline (skip detection)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/phase3/pipeline.py",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--video", "data/samples/real_dashcam.mp4",
+        "--keyframes", "3",
+        "--skip-detection"
+      ],
+      "env": {
+        "DASHCAM_MOCK_OLLAMA": "1"
+      },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Run Ablation Study",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/phase5/evaluate.py",
+      "python": "${workspaceFolder}/.venv/bin/python3",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "ablation",
+        "--video", "data/samples/real_dashcam.mp4"
+      ],
+      "env": {
+        "DASHCAM_MOCK_OLLAMA": "1"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
