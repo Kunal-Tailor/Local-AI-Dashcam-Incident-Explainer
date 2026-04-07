@@ -23,6 +23,7 @@ import os
 import sys
 import tempfile
 import time
+import base64
 from pathlib import Path
 from datetime import datetime
 
@@ -59,6 +60,72 @@ def get_singletons():
     if _pdf_exporter is None:
         _pdf_exporter = PDFExporter()
     return _detector, _privacy, _pdf_exporter
+
+
+def _img_to_data_uri(path: Path | None) -> str | None:
+    if path is None or not path.exists():
+        return None
+    try:
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return None
+
+
+def _img_tag(data_uri: str | None, cls: str, alt: str) -> str:
+    if data_uri:
+        return f'<img class="{cls}" src="{data_uri}" alt="{alt}" />'
+    return f'<div class="{cls} placeholder" aria-label="{alt}"></div>'
+
+
+def _pipeline_svg() -> str:
+    return """
+    <svg class="media-svg" viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline schematic">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#0f766e"/>
+          <stop offset="100%" stop-color="#f97316"/>
+        </linearGradient>
+      </defs>
+      <rect x="10" y="20" width="700" height="200" rx="16" fill="rgba(255,255,255,0.85)" stroke="rgba(20,32,51,0.12)" />
+      <g font-family="Space Grotesk, sans-serif" font-size="13" fill="#142033">
+        <rect x="30" y="60" width="120" height="72" rx="12" fill="rgba(15,118,110,0.10)" stroke="rgba(15,118,110,0.3)"/>
+        <text x="90" y="92" text-anchor="middle" font-weight="700">Keyframes</text>
+        <text x="90" y="112" text-anchor="middle" fill="#2b3a52">Motion sampling</text>
+
+        <rect x="180" y="60" width="120" height="72" rx="12" fill="rgba(15,118,110,0.10)" stroke="rgba(15,118,110,0.3)"/>
+        <text x="240" y="92" text-anchor="middle" font-weight="700">Detection</text>
+        <text x="240" y="112" text-anchor="middle" fill="#2b3a52">YOLO + SORT</text>
+
+        <rect x="330" y="60" width="120" height="72" rx="12" fill="rgba(15,118,110,0.10)" stroke="rgba(15,118,110,0.3)"/>
+        <text x="390" y="92" text-anchor="middle" font-weight="700">VLM JSON</text>
+        <text x="390" y="112" text-anchor="middle" fill="#2b3a52">Scene logic</text>
+
+        <rect x="480" y="60" width="120" height="72" rx="12" fill="rgba(15,118,110,0.10)" stroke="rgba(15,118,110,0.3)"/>
+        <text x="540" y="92" text-anchor="middle" font-weight="700">Privacy</text>
+        <text x="540" y="112" text-anchor="middle" fill="#2b3a52">Blur filters</text>
+
+        <rect x="630" y="60" width="70" height="72" rx="12" fill="rgba(15,118,110,0.10)" stroke="rgba(15,118,110,0.3)"/>
+        <text x="665" y="92" text-anchor="middle" font-weight="700">PDF</text>
+        <text x="665" y="112" text-anchor="middle" fill="#2b3a52">Export</text>
+      </g>
+      <g stroke="url(#g1)" stroke-width="2" fill="none">
+        <path d="M150 96 L180 96"/>
+        <path d="M300 96 L330 96"/>
+        <path d="M450 96 L480 96"/>
+        <path d="M600 96 L630 96"/>
+      </g>
+      <g fill="#0f766e">
+        <circle cx="150" cy="96" r="4"/>
+        <circle cx="300" cy="96" r="4"/>
+        <circle cx="450" cy="96" r="4"/>
+        <circle cx="600" cy="96" r="4"/>
+      </g>
+      <text x="36" y="170" font-family="IBM Plex Mono, monospace" font-size="11" fill="#667085">
+        Offline pipeline: ingest → detect → narrate → anonymize → export
+      </text>
+    </svg>
+    """
 
 
 # ─── Processing pipeline ─────────────────────────────────────────────────────
@@ -241,6 +308,13 @@ CSS = """
     --accent: #0f766e;
     --accent-2: #f97316;
     --accent-3: #16a34a;
+    --accent-4: #38bdf8;
+    --accent-5: #facc15;
+    --glow: 0 24px 60px rgba(20, 32, 51, 0.18);
+}
+
+* {
+    box-sizing: border-box;
 }
 
 /* ── Base ──────────────────────────────────────────────────────── */
@@ -258,14 +332,51 @@ body, .gradio-container {
     padding: 22px 24px 44px !important;
     width: 100% !important;
     min-height: 92vh !important;
+    position: relative;
 }
 .contain, .gap, footer { background: transparent !important; }
+.gradio-container::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(900px 420px at 18% -10%, rgba(15,118,110,0.16), transparent 70%),
+      radial-gradient(820px 520px at 120% 16%, rgba(249,115,22,0.16), transparent 70%),
+      repeating-linear-gradient(90deg, rgba(20,32,51,0.04) 0 1px, transparent 1px 120px),
+      repeating-linear-gradient(0deg, rgba(20,32,51,0.04) 0 1px, transparent 1px 120px),
+      radial-gradient(600px 220px at 50% 100%, rgba(56,189,248,0.18), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    animation: gridshift 28s ease-in-out infinite;
+}
+.gradio-container::after {
+    content: "";
+    position: fixed;
+    inset: -10% -10% -10% -10%;
+    background:
+      radial-gradient(520px 420px at 12% 30%, rgba(15,118,110,0.18), transparent 70%),
+      radial-gradient(520px 420px at 88% 25%, rgba(249,115,22,0.18), transparent 70%),
+      radial-gradient(520px 420px at 50% 78%, rgba(56,189,248,0.18), transparent 70%);
+    filter: blur(10px);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 0;
+    animation: blobdrift 22s ease-in-out infinite;
+}
+.gradio-container > * {
+    position: relative;
+    z-index: 1;
+}
 
 /* ── Hero ──────────────────────────────────────────────────────── */
 #hero {
     background:
-      linear-gradient(135deg, rgba(15,118,110,0.10), rgba(249,115,22,0.10)),
-      rgba(255,255,255,0.82);
+      linear-gradient(135deg, rgba(15,118,110,0.18), rgba(249,115,22,0.18)),
+      var(--hero-bg, none),
+      rgba(255,255,255,0.86);
+    background-size: 100% 100%, cover, auto;
+    background-position: center, center, center;
+    background-blend-mode: screen, normal, normal;
     border: 1px solid var(--stroke);
     border-radius: 20px;
     padding: 28px 32px;
@@ -275,7 +386,8 @@ body, .gradio-container {
     display: grid;
     grid-template-columns: 1.2fr 0.8fr;
     gap: 22px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--glow);
+    backdrop-filter: blur(6px);
 }
 #hero::before {
     content: "";
@@ -307,6 +419,13 @@ body, .gradio-container {
     text-transform: uppercase;
     color: var(--accent);
     font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(15,118,110,0.25);
+    padding: 4px 10px;
+    border-radius: 999px;
 }
 .hero-text {
     position: relative;
@@ -331,14 +450,15 @@ body, .gradio-container {
     gap: 8px;
 }
 .chip {
-    background: rgba(15,118,110,0.08);
-    border: 1px solid rgba(15,118,110,0.2);
+    background: linear-gradient(135deg, rgba(15,118,110,0.16), rgba(249,115,22,0.12));
+    border: 1px solid rgba(15,118,110,0.25);
     color: var(--ink-1);
     border-radius: 999px;
     padding: 6px 12px;
     font-size: 0.78rem;
     font-weight: 600;
     white-space: nowrap;
+    box-shadow: 0 10px 20px rgba(20,32,51,0.08);
 }
 .hero-card {
     background: rgba(255,255,255,0.9);
@@ -348,6 +468,94 @@ body, .gradio-container {
     box-shadow: 0 12px 30px rgba(15, 118, 110, 0.08);
     position: relative;
     z-index: 1;
+}
+.hero-side {
+    display: grid;
+    gap: 12px;
+}
+.hero-media {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--stroke);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    z-index: 0;
+}
+.hero-media > * { position: relative; z-index: 1; }
+.hero-media::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 20% 0%, rgba(56,189,248,0.18) 0%, transparent 55%),
+                radial-gradient(circle at 80% 100%, rgba(249,115,22,0.18) 0%, transparent 55%);
+    pointer-events: none;
+}
+.hero-media .media-figure {
+    border: none;
+    background: transparent;
+    overflow: visible;
+}
+.hero-media .media-figure::after { display: none; }
+.hero-stack {
+    position: relative;
+    min-height: 230px;
+    display: grid;
+    align-items: center;
+}
+.hero-frame {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--stroke);
+    background: rgba(255,255,255,0.75);
+    box-shadow: 0 18px 45px rgba(20,32,51,0.18);
+}
+.hero-frame-main .media-img,
+.hero-frame-main .placeholder {
+    height: 210px;
+}
+.hero-frame-float {
+    position: absolute;
+    right: -8px;
+    bottom: -12px;
+    width: 60%;
+    transform: rotate(2.8deg);
+    box-shadow: 0 22px 50px rgba(249,115,22,0.22);
+}
+.hero-frame-float .media-img,
+.hero-frame-float .placeholder {
+    height: 140px;
+}
+.hero-media-title {
+    font-size: 0.78rem;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+}
+.hero-media-caption {
+    font-size: 0.82rem;
+    color: var(--ink-1);
+    line-height: 1.55;
+}
+.hero-media-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.hero-badge {
+    background: linear-gradient(135deg, rgba(15,118,110,0.18), rgba(56,189,248,0.18));
+    border: 1px solid rgba(15,118,110,0.35);
+    color: #0b544f;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
 }
 .hero-card-title {
     font-size: 0.8rem;
@@ -373,6 +581,8 @@ body, .gradio-container {
     border-radius: 50%;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
     flex-shrink: 0;
+    box-shadow: 0 0 0 0 rgba(15,118,110,0.45);
+    animation: pulse 3s ease-in-out infinite;
 }
 
 /* ── Two-column row ─────────────────────────────────────────────── */
@@ -389,6 +599,30 @@ body, .gradio-container {
     box-shadow: var(--shadow);
 }
 .card .wrap { background: transparent !important; }
+.card,
+.feature-card,
+.media-card,
+.kpi-card,
+.signal-card,
+.detail-card,
+.use-card,
+.cta-band,
+.hero-card,
+.hero-media {
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.feature-card:hover,
+.media-card:hover,
+.kpi-card:hover,
+.signal-card:hover,
+.detail-card:hover,
+.use-card:hover,
+.hero-card:hover,
+.hero-media:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 50px rgba(20, 32, 51, 0.18);
+    border-color: rgba(15,118,110,0.35);
+}
 
 /* ── Sections ──────────────────────────────────────────────────── */
 .section {
@@ -456,6 +690,152 @@ body, .gradio-container {
     text-transform: uppercase;
     letter-spacing: 1.2px;
     color: var(--accent);
+}
+
+.media-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.media-card {
+    background: var(--card);
+    border: 1px solid var(--stroke);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: grid;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+}
+.media-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(15,118,110,0.12), rgba(249,115,22,0.12));
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+.media-card:hover::before { opacity: 0.2; }
+.media-figure {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--stroke);
+    background: rgba(255,255,255,0.75);
+    position: relative;
+}
+.media-figure::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.0) 0%, rgba(20,32,51,0.12) 100%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 6px);
+    opacity: 0.35;
+    pointer-events: none;
+}
+.media-img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    display: block;
+    filter: saturate(1.1) contrast(1.05);
+}
+.media-svg {
+    width: 100%;
+    height: 180px;
+    display: block;
+}
+.media-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink-0);
+}
+.media-desc {
+    font-size: 0.86rem;
+    color: var(--ink-1);
+    line-height: 1.55;
+}
+.placeholder {
+    width: 100%;
+    height: 180px;
+    border-radius: 12px;
+    border: 1px dashed rgba(15,118,110,0.35);
+    background: linear-gradient(135deg, rgba(15,118,110,0.15), rgba(249,115,22,0.18));
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+.kpi-card {
+    background: var(--card);
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+.kpi-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-4));
+    opacity: 0.75;
+}
+.kpi-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 4px;
+}
+.kpi-lbl {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+.signal-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+.signal-card {
+    background: rgba(255,255,255,0.85);
+    border: 1px solid var(--stroke);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: grid;
+    gap: 6px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+}
+.signal-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent-2), var(--accent), var(--accent-5));
+    opacity: 0.7;
+}
+.signal-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink-0);
+}
+.signal-desc {
+    font-size: 0.82rem;
+    color: var(--ink-1);
+    line-height: 1.5;
 }
 
 .detail-grid {
@@ -994,37 +1374,90 @@ label > span, .label-wrap span {
     50% { transform: translateY(12px); }
     100% { transform: translateY(0px); }
 }
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(15,118,110,0.35); }
+    70% { box-shadow: 0 0 0 10px rgba(15,118,110,0); }
+    100% { box-shadow: 0 0 0 0 rgba(15,118,110,0); }
+}
+@keyframes blobdrift {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    33% { transform: translate3d(2%, -2%, 0) scale(1.02); }
+    66% { transform: translate3d(-2%, 2%, 0) scale(0.98); }
+    100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes gridshift {
+    0% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+    50% { background-position: -40px 20px, 30px -20px, 20px 10px, -20px -10px, 0 0; }
+    100% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+}
 
 /* ── Responsive ─────────────────────────────────────────────────── */
 @media (max-width: 980px) {
     #hero { grid-template-columns: 1fr; }
+    .hero-stack { min-height: unset; }
+    .hero-frame-float {
+        position: relative;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        transform: none;
+        margin-top: 10px;
+    }
     .stats-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .media-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .split-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .cta-band { flex-direction: column; align-items: flex-start; }
     .detail-grid { grid-template-columns: 1fr; }
     .mini-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .use-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .signal-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
     .stats-row { grid-template-columns: 1fr; }
+    .hero-frame-main .media-img,
+    .hero-frame-main .placeholder { height: 180px; }
+    .hero-frame-float .media-img,
+    .hero-frame-float .placeholder { height: 140px; }
     .feature-grid { grid-template-columns: 1fr; }
+    .media-grid { grid-template-columns: 1fr; }
     .split-grid { grid-template-columns: 1fr; }
     .tl-step { grid-template-columns: 1fr; }
     .tl-num { margin-bottom: 6px; }
     .mini-row { grid-template-columns: 1fr; }
     .use-grid { grid-template-columns: 1fr; }
+    .kpi-grid { grid-template-columns: 1fr; }
+    .signal-row { grid-template-columns: 1fr; }
 }
 """
 
 
 def build_ui():
+    _proj_root = Path(__file__).resolve().parents[2]
+    _shots = sorted(_proj_root.glob("Screenshot*.png"))
+    _shot_a = _img_to_data_uri(_shots[0]) if len(_shots) > 0 else None
+    _shot_b = _img_to_data_uri(_shots[1]) if len(_shots) > 1 else None
+    _hero_img = _shot_b or _shot_a
+    hero_media_img = _img_tag(_hero_img, "media-img", "Gradio UI preview")
+    tour_img_a = _img_tag(_shot_a, "media-img", "Dashboard overview")
+    tour_img_b = _img_tag(_shot_b, "media-img", "Report and keyframe preview")
+    pipeline_svg = _pipeline_svg()
+    hero_bg_style = f"--hero-bg: url('{_hero_img}')" if _hero_img else "--hero-bg: none"
+    hero_stack_float = tour_img_a if _shot_a else hero_media_img
+    hero_media_stack = f"""
+    <div class="hero-stack">
+      <div class="hero-frame hero-frame-main">{hero_media_img}</div>
+      <div class="hero-frame hero-frame-float">{hero_stack_float}</div>
+    </div>
+    """
+
     with gr.Blocks(title="🚗 Local AI Dashcam Incident Explainer") as demo:
         with gr.Tabs(elem_id="top-tabs"):
             with gr.Tab("Overview"):
                 # ── Hero ─────────────────────────────────────────────────
-                gr.HTML("""
-                <div id="hero">
+                gr.HTML(f"""
+                <div id="hero" style="{hero_bg_style}">
                   <div class="hero-text">
                     <div class="hero-kicker">Local AI | Private by design | Offline</div>
                     <div class="hero-title">Local AI Dashcam Incident Explainer</div>
@@ -1041,14 +1474,104 @@ def build_ui():
                       <span class="chip">Privacy blur</span>
                     </div>
                   </div>
-                  <div class="hero-card">
-                    <div class="hero-card-title">Outputs you get</div>
-                    <div class="hero-item"><span class="dot"></span>Annotated keyframes with privacy blur</div>
-                    <div class="hero-item"><span class="dot"></span>Structured JSON with severity and fault analysis</div>
-                    <div class="hero-item"><span class="dot"></span>Readable insurance narrative</div>
-                    <div class="hero-item"><span class="dot"></span>Exportable PDF report</div>
+                  <div class="hero-side">
+                    <div class="hero-card">
+                      <div class="hero-card-title">Outputs you get</div>
+                      <div class="hero-item"><span class="dot"></span>Annotated keyframes with privacy blur</div>
+                      <div class="hero-item"><span class="dot"></span>Structured JSON with severity and fault analysis</div>
+                      <div class="hero-item"><span class="dot"></span>Readable insurance narrative</div>
+                      <div class="hero-item"><span class="dot"></span>Exportable PDF report</div>
+                    </div>
+                    <div class="hero-media">
+                      <div class="hero-media-title">Interface preview</div>
+                      <div class="media-figure">{hero_media_stack}</div>
+                      <div class="hero-media-caption">
+                        A live look at the local Gradio interface that produces the keyframes, JSON, and report
+                        bundle without leaving your device.
+                      </div>
+                      <div class="hero-media-badges">
+                        <span class="hero-badge">Local only</span>
+                        <span class="hero-badge">PDF ready</span>
+                        <span class="hero-badge">Privacy blur</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+                """)
+
+                gr.HTML(f"""
+                <section class="section">
+                  <div class="section-head">
+                    <div class="section-kicker">Visual tour</div>
+                    <div class="section-title">See the pipeline at a glance</div>
+                    <div class="section-sub">
+                      A quick snapshot of the UI, the report outputs, and the offline pipeline
+                      that connects the entire workflow end to end.
+                    </div>
+                  </div>
+                  <div class="media-grid">
+                    <div class="media-card">
+                      <div class="media-figure">{tour_img_a}</div>
+                      <div class="media-title">Dashboard overview</div>
+                      <div class="media-desc">
+                        Upload a clip, tune keyframe sampling, and monitor the pipeline in real time.
+                      </div>
+                    </div>
+                    <div class="media-card">
+                      <div class="media-figure">{tour_img_b}</div>
+                      <div class="media-title">Report-ready outputs</div>
+                      <div class="media-desc">
+                        A clear narrative report, structured JSON, and an exportable PDF package.
+                      </div>
+                    </div>
+                    <div class="media-card">
+                      <div class="media-figure">{pipeline_svg}</div>
+                      <div class="media-title">Offline pipeline</div>
+                      <div class="media-desc">
+                        Each phase runs locally, passing context from detection to narration to export.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="kpi-grid">
+                    <div class="kpi-card">
+                      <div class="kpi-val">3</div>
+                      <div class="kpi-lbl">Phases of AI</div>
+                    </div>
+                    <div class="kpi-card">
+                      <div class="kpi-val">0</div>
+                      <div class="kpi-lbl">Cloud calls</div>
+                    </div>
+                    <div class="kpi-card">
+                      <div class="kpi-val">100%</div>
+                      <div class="kpi-lbl">Local compute</div>
+                    </div>
+                    <div class="kpi-card">
+                      <div class="kpi-val">PDF</div>
+                      <div class="kpi-lbl">Evidence pack</div>
+                    </div>
+                  </div>
+                  <div class="signal-row">
+                    <div class="signal-card">
+                      <div class="signal-title">Signals captured</div>
+                      <div class="signal-desc">
+                        Motion spikes, vehicle trajectories, and contextual cues are fused into one
+                        structured narrative.
+                      </div>
+                    </div>
+                    <div class="signal-card">
+                      <div class="signal-title">Human readable</div>
+                      <div class="signal-desc">
+                        The report is designed for reviewers, instructors, and claims teams to read quickly.
+                      </div>
+                    </div>
+                    <div class="signal-card">
+                      <div class="signal-title">Audit friendly</div>
+                      <div class="signal-desc">
+                        JSON outputs preserve metadata, severity, and fault analysis for later checks.
+                      </div>
+                    </div>
+                  </div>
+                </section>
                 """)
 
                 gr.HTML("""
@@ -1592,7 +2115,11 @@ def build_ui():
                           <td>End-to-end local pipeline</td>
                         </tr>
                         <tr>
-                          <td>DoTA: Unsupervised Detection of Traffic Anomaly (2023)</td>
+                          <td>
+                            <a href="https://doi.org/10.1109/TPAMI.2022.3150763" target="_blank" rel="noopener">
+                              DoTA: Unsupervised Detection of Traffic Anomaly (TPAMI 2023)
+                            </a>
+                          </td>
                           <td>Not specified</td>
                           <td>No</td>
                           <td>Anomaly localization</td>
@@ -1600,7 +2127,11 @@ def build_ui():
                           <td>Focuses on anomaly detection, not report generation</td>
                         </tr>
                         <tr>
-                          <td>Uncertainty-based Accident Anticipation (MM 2020)</td>
+                          <td>
+                            <a href="https://dl.acm.org/doi/10.1145/3394171.3413827" target="_blank" rel="noopener">
+                              Uncertainty-based Accident Anticipation (MM 2020)
+                            </a>
+                          </td>
                           <td>Not specified</td>
                           <td>No</td>
                           <td>Accident probability / anticipation</td>
@@ -1608,7 +2139,11 @@ def build_ui():
                           <td>Predicts accidents early; no privacy or PDF outputs</td>
                         </tr>
                         <tr>
-                          <td>DADA-2000 Attention Benchmark (2019)</td>
+                          <td>
+                            <a href="https://arxiv.org/abs/1904.12634" target="_blank" rel="noopener">
+                              DADA-2000 Attention Benchmark (ITSC 2019)
+                            </a>
+                          </td>
                           <td>Not specified</td>
                           <td>No</td>
                           <td>Attention + accident prediction</td>
@@ -1706,7 +2241,6 @@ def build_ui():
                         # Section heading
                         gr.HTML('<div class="sec-head">⚙️ &nbsp;Configuration</div>')
 
-                        _proj_root = Path(__file__).resolve().parents[2]
                         _real  = _proj_root / "data/samples/real_dashcam.mp4"
                         _synth = _proj_root / "data/samples/test_dashcam_h264.mp4"
                         _sample = str(_real if _real.exists() else _synth if _synth.exists() else "")

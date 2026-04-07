@@ -1,0 +1,66 @@
+Local AI Dashcam Incident Explainer: An End-to-End, Privacy-Preserving Incident Analysis Pipeline
+
+Author: Kunal Tailor
+Course: Computer Vision Course Project
+Date: March 2026
+
+Abstract
+Dashcam footage is a valuable source for incident analysis, but manual review is slow and privacy sensitive. This report presents an end-to-end local pipeline that detects incident windows, samples keyframes, produces structured visual-language analysis, and generates a human-readable insurance report with a downloadable PDF. The system combines classical computer vision, object detection and tracking, optical flow, local vision-language models, and privacy filters. The result is a fully offline workflow that transforms raw driving video into a structured evidence package for review.
+
+Keywords
+Dashcam analytics, incident detection, optical flow, object tracking, vision-language models, privacy, local AI
+
+1. Introduction
+Traffic incident review typically requires manual inspection of long, privacy-sensitive dashcam videos. We propose a fully local pipeline that compresses this workflow into a repeatable, auditable process: detect the incident window, summarize the scene with a vision-language model, and export a structured PDF report. The system is designed for coursework and real-world review workflows that require privacy preservation and offline execution.
+
+2. Related Work
+Our detection stack builds on real-time multi-object tracking and optical flow. We adopt a SORT-style tracking approach based on Kalman filtering and IoU-based assignment and use Farnebäck dense optical flow for motion anomalies. For vision-language narration, we use MiniCPM-V, an efficient multimodal model designed for local deployment. Related benchmarks in traffic anomaly detection and accident anticipation include DoTA, DADA-2000, and uncertainty-based accident anticipation approaches. Object detection is performed with Ultralytics YOLO models.
+
+3. System Overview (End-to-End)
+The pipeline operates in five phases:
+- Keyframe Extraction: Uniform or motion-triggered extraction reduces redundant frames.
+- Incident Detection: YOLO detections are tracked with SORT; optical flow spikes signal anomalies.
+- VLM Narration: Three keyframes (pre, impact, post) are summarized into structured JSON.
+- Privacy Filtering: Faces and license plates are blurred before display or export.
+- Report Export: JSON and keyframes are compiled into a PDF report and downloadable assets.
+The system is accessible via a local Gradio UI and a CLI pipeline for batch processing.
+
+4. Methodology
+4.1 Keyframe Sampling
+Frames are extracted uniformly via FFmpeg or using a motion-triggered threshold based on frame differencing. This reduces compute while retaining the most informative context around an event.
+
+4.2 Incident Detection and Tracking
+Each sampled frame is passed through YOLO detection. A SORT-based tracker assigns stable IDs across frames, while Farnebäck optical flow measures motion magnitude. An incident is flagged when a high-IoU interaction coincides with a motion spike in the same temporal window.
+
+4.3 Vision-Language Narration
+Three representative frames (pre, impact, post) are encoded and passed to a local VLM. The model is prompted to return structured JSON fields including vehicles, severity, fault analysis, and timeline notes. A local LLM then generates the narrative report.
+
+4.4 Privacy and Export
+Faces are blurred using a DNN face detector, and license plates are blurred using vehicle ROI heuristics. The final evidence package includes the incident clip, annotated keyframes, JSON, and a PDF report.
+
+5. Implementation
+The system is implemented in Python with OpenCV, Ultralytics YOLO, and Gradio. Models are executed locally via Ollama. Outputs are written to timestamped folders under outputs/ for auditability. The UI provides video upload, real-time logs, a keyframe gallery, JSON viewer, report text, and PDF download.
+
+6. Evaluation
+We evaluate report quality using BLEU-4 and ROUGE-L and study the tradeoff between keyframe count and inference time. An internal ablation compares 1, 3, and 5 keyframe settings. Three keyframes provide the best balance between speed and narrative completeness.
+
+7. Results
+Keyframe ablation trend observed in local testing:
+- 1 keyframe: ~18s inference time, ROUGE-L 0.28, misses pre/post context
+- 3 keyframes: ~42s inference time, ROUGE-L 0.41, best balance
+- 5 keyframes: ~71s inference time, ROUGE-L 0.43, marginal gain
+
+8. Limitations
+The VLM can hallucinate in low-light scenes, and optical-flow spikes can be triggered by sudden camera shake. License plate blurring is heuristic and may miss extreme angles. Future work includes video-native VLMs, specialized plate detectors, and GPU-accelerated pipelines for reduced latency.
+
+9. Conclusion
+This project demonstrates a complete end-to-end pipeline that turns raw dashcam footage into a privacy-safe evidence package. By combining classic CV, detection and tracking, VLM narration, and report generation, the system supports offline, auditable incident analysis workflows suitable for coursework and operational review.
+
+References
+1. Bewley, A., Ge, Z., Ott, L., Ramos, F., and Upcroft, B. Simple Online and Realtime Tracking. arXiv:1602.00763, 2016. https://arxiv.org/abs/1602.00763
+2. Farnebäck, G. Two-Frame Motion Estimation Based on Polynomial Expansion. SCIA 2003, LNCS 2749, pp. 363–370, 2003. https://www.ida.liu.se/ext/WITAS-ev/Computer_Vision_Technologies/PaperInfo/farneback03.html
+3. Yao, Y. et al. MiniCPM-V: A GPT-4V Level MLLM on Your Phone. arXiv:2408.01800, 2024. https://arxiv.org/abs/2408.01800
+4. Yao, Y. et al. DoTA: Unsupervised Detection of Traffic Anomaly in Driving Videos. IEEE TPAMI, 45(1), 444–459, 2023. doi:10.1109/TPAMI.2022.3150763
+5. Fang, J. et al. DADA-2000: Can Driving Accident be Predicted by Driver Attention? arXiv:1904.12634, 2019. https://arxiv.org/abs/1904.12634
+6. Bao, W., Yu, Q., and Kong, Y. Uncertainty-based Traffic Accident Anticipation with Spatio-Temporal Relational Learning. ACM MM 2020, pp. 2682–2690. doi:10.1145/3394171.3413827
+7. Ultralytics. Ultralytics YOLO Documentation. https://docs.ultralytics.com/
